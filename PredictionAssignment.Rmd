@@ -1,0 +1,103 @@
+---
+title: "Prediction Assignment"
+author: "Babita"
+date: "4 September 2020"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+```{r message=FALSE,warning=FALSE}
+library(RCurl)
+library(caret)
+```
+
+
+## Downloading Data
+```{r, message=FALSE, warning=FALSE}
+setwd("F:\\Work\\Techwalnut\\DS And ML\\Courses\\Coursera\\DS Specialization _JHU\\Course8_Practical_ML\\Week4\\Peer Assignment\\DS_C8_PredictionAssignment")
+
+if (!file.exists("./pml-training.csv")) {
+  url.training <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+  download.file(url.training, destfile = "./pml-training.csv")
+}
+
+if (!file.exists("./pml-testing.csv")) {
+  url.testing <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+  download.file(url.testing, destfile = "./pml-testing.csv")
+}
+```
+
+## Reading Data
+```{r}
+trainData<- read.csv("./pml-training.csv")
+testData<- read.csv("./pml-testing.csv")
+```
+
+
+### Data Preprocessing
+Removing N/As and unuseful columns
+```{r}
+
+trainData <- trainData[, colSums(is.na(trainData)) == 0] 
+testData <- testData[, colSums(is.na(testData)) == 0] 
+classe <- trainData$classe
+trainR <- grepl("^X|timestamp|window", names(trainData))
+trainData <- trainData[, !trainR]
+trainM <- trainData[, sapply(trainData, is.numeric)]
+trainM$classe <- classe
+testR <- grepl("^X|timestamp|window", names(testData))
+testData<- testData[, !testR]
+testM <- testData[, sapply(testData, is.numeric)]
+```
+
+### Spliting Data into train and test
+```{r}
+set.seed(12345) 
+inTrain <- createDataPartition(trainM$classe, p=0.70, list=F)
+train_data <- trainM[inTrain, ]
+test_data <- trainM[-inTrain, ]
+```
+
+### Random Forest Model
+```{r}
+setting <- trainControl(method="cv", 5)
+RandomForest <- train(classe ~ ., data=train_data, method="rf", trControl=setting,
+                      ntree = 100)
+RandomForest
+```
+
+
+### Accuracy and out-of-sample error
+
+
+```{r}
+predict_RandomForest <- predict(RandomForest, test_data)
+confusionMatrix(test_data$classe, predict_RandomForest)
+
+```
+```{r}
+accuracy <- postResample(predict_RandomForest, test_data$classe)
+error<-1 - as.numeric(confusionMatrix(test_data$classe, predict_RandomForest)$overall[1])
+error
+
+```
+
+Accuracy: `r accuracy[1]*100`%
+
+out-of-sample error: `r error*100`%
+
+### Prediction on test data
+
+```{r}
+predict(RandomForest, testM)
+```
+
